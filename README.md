@@ -2,19 +2,15 @@
 
 An automated, user-friendly R pipeline for conducting systematic and scoping literature reviews across **Elsevier Scopus** and **OpenAlex** bibliographic databases.
 
-------------------------------------------------------------------------
-
 ## 🎯 What This Tool Does
 
 This pipeline automates the labor-intensive initial stages of a systematic literature review:
 
-1.  **Constructs Boolean API Queries**: Combines your thematic search keywords and geographic filters using precise boolean logic.
-2.  **Queries Scopus & OpenAlex**: Programmatically retrieves academic publications, handling pagination and rate limits automatically.
-3.  **Harmonizes Metadata**: Standardizes schemas across both databases into a single clean format.
-4.  **Performs 2-Stage Deduplication**: Merges duplicate papers across databases using exact DOI matching and fuzzy title string matching.
-5.  **Exports Ready-to-Analyze Data**: Writes a clean, structured CSV dataset to `outputs/scoping_review_dataset.csv`.
-
-------------------------------------------------------------------------
+1. **Constructs Boolean API Queries**: Combines your thematic search keywords and geographic filters using precise boolean logic.
+2. **Queries Scopus & OpenAlex**: Programmatically retrieves academic publications, handling pagination and rate limits automatically.
+3. **Harmonizes Metadata**: Standardizes schemas across both databases into a single clean format.
+4. **Performs 2-Stage Deduplication**: Merges duplicate papers across databases using exact DOI matching and fuzzy title string matching.
+5. **Exports Ready-to-Analyze Data**: Writes a clean, structured CSV dataset to `outputs/scoping_review_dataset.csv`.
 
 ## 🔍 How the Search Logic Works
 
@@ -22,11 +18,13 @@ Understanding how your search parameters are built into API queries:
 
 ### 1. Topic Keywords (`OR` Logic)
 
-Keywords grouped inside each topic category in `SEARCH_TOPICS` are joined together with **`OR`** operators: \> `("political party" OR "party organization" OR "party decline")`
+Keywords grouped inside each topic category in `SEARCH_TOPICS` are joined together with **`OR`** operators:
+> `("political party" OR "party organization" OR "party decline")`
 
 ### 2. Geographic Terms (`OR` Logic)
 
-Geographic terms in `GEO_TERMS` are joined together with **`OR`** operators: \> `("Africa" OR "Sub-Saharan Africa" OR "West Africa")`
+Geographic terms in `GEO_TERMS` are joined together with **`OR`** operators:
+> `("Africa" OR "Sub-Saharan Africa" OR "West Africa")`
 
 ### 3. Combining Topics & Geography (`AND` Logic)
 
@@ -36,15 +34,13 @@ $$\text{Final Query} = \Big( \text{Keyword}_1 \text{ OR } \text{Keyword}_2 \text
 
 **Scopus Query Example**: `TITLE-ABS-KEY(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR > 2019`
 
-------------------------------------------------------------------------
-
 ## ⚙️ Quick Start Guide
 
 ### 1. Prerequisites & Installation
 
 Install the required R packages (R version 4.1+ recommended):
 
-``` r
+```r
 install.packages(c(
   "rscopus",
   "openalexR",
@@ -63,7 +59,7 @@ Store your API keys in your user R environment file (`~/.Renviron`). This allows
 
 Add the following lines to `~/.Renviron`:
 
-``` env
+```env
 OPENALEX_KEY="your_openalex_api_key"
 ELSEVIER_SCOPUS_KEY="your_scopus_api_key"
 ```
@@ -71,13 +67,11 @@ ELSEVIER_SCOPUS_KEY="your_scopus_api_key"
 - **OpenAlex Key**: Get a free API key at [OpenAlex.org](https://openalex.org) (unlocks 100,000 queries/day).
 - **Scopus Key**: Provided by your university library or Elsevier developer portal. *(If omitted, the pipeline skips Scopus and runs cleanly on OpenAlex)*.
 
-------------------------------------------------------------------------
-
 ## 🛠️ Customizing `api_pipeline.R`
 
 All user settings are configured at the top of [`api_pipeline.R`](file:///Users/jt17630/Documents/PPADEM/Code/Systematic_Review_Pipeline/api_pipeline.R):
 
-``` r
+```r
 # 1. Define Search Topics & Keywords
 SEARCH_TOPICS <- list(
   party_linkages = c(
@@ -94,17 +88,13 @@ MAX_SCOPUS_RECORDS  <- 5000  # Max total records to fetch per topic from Scopus
 MAX_OPENALEX_PAGES  <- 20    # Max pages (200 records per page) from OpenAlex
 ```
 
-------------------------------------------------------------------------
-
 ## 🚀 Running the Pipeline
 
 Execute the pipeline directly from your terminal or Positron/RStudio console:
 
-``` bash
+```bash
 Rscript api_pipeline.R
 ```
-
-------------------------------------------------------------------------
 
 ## 🔄 What Happens Under the Hood
 
@@ -120,8 +110,6 @@ When you execute `api_pipeline.R`, the system runs two main steps:
 
 - **Stage 1 (Clean DOI Exact Match)**: Standardizes DOIs (stripping `https://doi.org/`, `doi:`, trailing slashes, and lowercasing) and merges records found in both databases while tracking provenance (`database = "Scopus; OpenAlex"`).
 - **Stage 2 (Title Fuzzy Match)**: Cleans title punctuation and applies Jaro-Winkler string distance matching ($\le 0.12$) constrained within $\pm 1$ publication year to merge records missing DOIs or suffering from minor title typos.
-
-------------------------------------------------------------------------
 
 ## 📊 Output File Schema
 
@@ -140,8 +128,6 @@ The final deduplicated dataset is saved to `outputs/scoping_review_dataset.csv`:
 | `citations` | Highest reported citation count | `14` |
 | `abstract` | Full article text abstract | `This article examines...` |
 | `authors` | Semicolon-separated list of author names | `Smith, J.; Kwame, A.` |
-
-------------------------------------------------------------------------
 
 ## 📁 Repository Structure
 
