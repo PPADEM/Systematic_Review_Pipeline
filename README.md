@@ -82,12 +82,6 @@ All user settings are configured at the top of [`api_pipeline.R`](file:///Users/
 SEARCH_TOPICS <- list(
   party_linkages = c(
     "political party", "party organization", "party linkage", "party decline"
-  ),
-  constituency_representation = c(
-    "constituency service", "constituency focus", "local representation"
-  ),
-  responsiveness_patronage = c(
-    "clientelism", "patronage", "service responsiveness"
   )
 )
 
