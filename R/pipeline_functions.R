@@ -58,7 +58,7 @@ oa_fetch_retry <- function(..., max_retries = 3, sleep_sec = 10.0) {
       error = function(e) {
         if (str_detect(e$message, "429|Too Many Requests")) {
           wait_time <- sleep_sec * attempt
-          message(sprintf("      [OpenAlex 429 Throttle] Pausing %.1f seconds before retry (Attempt %d/%d)...", wait_time, attempt, max_retries))
+          message(sprintf("      [OpenAlex 429 Limit] Pausing %.1f seconds before retry (Attempt %d/%d)...", wait_time, attempt, max_retries))
           Sys.sleep(wait_time)
           return(NULL)
         }
@@ -87,9 +87,12 @@ parse_openalex_authors <- function(authorships_list) {
 # ------------------------------------------------------------------------------
 
 #' Query Elsevier Scopus API across topics and geographic terms
-fetch_scopus_data <- function(search_topics, geo_terms, start_year) {
+fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records = 5000) {
   sc_key <- Sys.getenv("ELSEVIER_SCOPUS_KEY")
-  if (sc_key == "") return(tibble())
+  if (sc_key == "") {
+    cat("   -> [Scopus] Key not found in environment (ELSEVIER_SCOPUS_KEY); skipping Scopus.\n")
+    return(tibble())
+  }
   set_api_key(sc_key)
   
   geo_str <- paste(sprintf('"%s"', geo_terms), collapse = " OR ")
@@ -99,11 +102,11 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year) {
     kw_str <- paste(sprintf('"%s"', str_replace_all(kw_vec, '^"|"$', '')), collapse = " OR ")
     scopus_q <- sprintf('TITLE-ABS-KEY((%s) AND (%s)) AND PUBYEAR > %d', kw_str, geo_str, start_year - 1)
     
-    cat(sprintf("   -> [Scopus] Querying topic: %s\n", category))
+    cat(sprintf("   -> [Scopus] Querying topic: %s (max limit: %d records)\n", category, max_records))
     Sys.sleep(1.0)
     
     tryCatch({
-      res <- scopus_search(query = scopus_q, max_count = 100, count = 10, verbose = FALSE)
+      res <- scopus_search(query = scopus_q, max_count = max_records, count = 10, verbose = FALSE)
       if (is.null(res$entries) || length(res$entries) == 0) return(tibble())
       
       map_dfr(res$entries, function(x) {
@@ -120,33 +123,42 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year) {
   })
 }
 
-#' Query OpenAlex API across topics and geographic terms
-fetch_openalex_data <- function(search_topics, geo_terms, start_year) {
-  geo_str <- if (length(geo_terms) > 0) paste(sprintf('"%s"', geo_terms), collapse = " OR ") else '"Africa"'
+#' Query OpenAlex API across topics and geographic terms using search parameter
+fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages = 20) {
+  oa_key <- Sys.getenv("OPENALEX_KEY")
+  if (oa_key != "") {
+    options(openalexR.apikey = oa_key)
+  }
+  
+  geo_main <- if (length(geo_terms) > 0) geo_terms[1] else "Africa"
   
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
-    cat(sprintf("   -> [OpenAlex] Querying topic: %s\n", category))
+    cat(sprintf("   -> [OpenAlex] Querying topic: %s (max pages: %d)\n", category, max_pages))
     
-    clean_kws <- str_replace_all(kw_vec, '^"|"$', '')
-    kw_or_str <- paste(sprintf('"%s"', clean_kws), collapse = " OR ")
-    query_str <- sprintf('(%s) AND (%s)', kw_or_str, geo_str)
+    topic_df <- map_dfr(kw_vec, function(kw) {
+      clean_kw <- str_replace_all(kw, '^"|"$', '')
+      q_str <- sprintf('"%s" "%s"', clean_kw, geo_main)
+      
+      Sys.sleep(1.0)
+      
+      block_res <- oa_fetch_retry(
+        entity = "works",
+        search = q_str,
+        from_publication_date = sprintf("%d-01-01", start_year),
+        pages = 1:max_pages, verbose = FALSE
+      )
+      
+      if (is.null(block_res) || nrow(block_res) == 0) return(tibble())
+      block_res
+    })
     
-    Sys.sleep(1.5)
+    if (nrow(topic_df) == 0) return(tibble())
+    topic_df <- topic_df %>% distinct(id, .keep_all = TRUE)
     
-    block_res <- oa_fetch_retry(
-      entity = "works",
-      title_and_abstract.search = query_str,
-      from_publication_date = sprintf("%d-01-01", start_year),
-      pages = 1:5, verbose = FALSE
-    )
+    authors_vec <- parse_openalex_authors(topic_df$authorships)
     
-    if (is.null(block_res) || nrow(block_res) == 0) return(tibble())
-    block_res <- block_res %>% distinct(id, .keep_all = TRUE)
-    
-    authors_vec <- parse_openalex_authors(block_res$authorships)
-    
-    block_res %>%
+    topic_df %>%
       mutate(
         database = "OpenAlex", query_category = category,
         scopus_id = NA_character_, openalex_id = id,
@@ -227,14 +239,14 @@ deduplicate_records <- function(df) {
 # 4. MASTER EXECUTION FUNCTION: run_scoping_review()
 # ------------------------------------------------------------------------------
 
-run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, output_dir = "outputs") {
+run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, max_scopus_records = 5000, max_openalex_pages = 20, output_dir = "outputs") {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
   cat("\n=================================================================\n")
   cat("1. STEP 1: Fetching Records from Scopus & OpenAlex\n")
   cat("=================================================================\n")
-  scopus_raw <- fetch_scopus_data(search_topics, geo_terms, start_year)
-  openalex_raw <- fetch_openalex_data(search_topics, geo_terms, start_year)
+  scopus_raw <- fetch_scopus_data(search_topics, geo_terms, start_year, max_records = max_scopus_records)
+  openalex_raw <- fetch_openalex_data(search_topics, geo_terms, start_year, max_pages = max_openalex_pages)
   combined_raw <- bind_rows(scopus_raw, openalex_raw)
   
   cat(sprintf("   -> Raw Records Retrieved: %d (Scopus: %d | OpenAlex: %d)\n", nrow(combined_raw), nrow(scopus_raw), nrow(openalex_raw)))
