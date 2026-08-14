@@ -86,7 +86,7 @@ parse_openalex_authors <- function(authorships_list) {
 # 2. INGESTION FUNCTIONS: SCOPUS & OPENALEX
 # ------------------------------------------------------------------------------
 
-#' Query Elsevier Scopus API across topics and geographic terms
+#' Query Elsevier Scopus API: TITLE-ABS-KEY((Topic_OR_Terms) AND (Geo_OR_Terms))
 fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records = 5000) {
   sc_key <- Sys.getenv("ELSEVIER_SCOPUS_KEY")
   if (sc_key == "") {
@@ -95,12 +95,19 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
   }
   set_api_key(sc_key)
   
-  geo_str <- paste(sprintf('"%s"', geo_terms), collapse = " OR ")
+  # Join all geographic terms with OR
+  clean_geos <- str_replace_all(geo_terms, '^"|"$', '')
+  geo_scopus_str <- paste(sprintf('"%s"', clean_geos), collapse = " OR ")
   
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
-    kw_str <- paste(sprintf('"%s"', str_replace_all(kw_vec, '^"|"$', '')), collapse = " OR ")
-    scopus_q <- sprintf('TITLE-ABS-KEY((%s) AND (%s)) AND PUBYEAR > %d', kw_str, geo_str, start_year - 1)
+    clean_kws <- str_replace_all(kw_vec, '^"|"$', '')
+    
+    # Join topic keywords with OR
+    kw_str <- paste(sprintf('"%s"', clean_kws), collapse = " OR ")
+    
+    # Combine (Topic ORs) AND (Geo ORs)
+    scopus_q <- sprintf('TITLE-ABS-KEY((%s) AND (%s)) AND PUBYEAR > %d', kw_str, geo_scopus_str, start_year - 1)
     
     cat(sprintf("   -> [Scopus] Querying topic: %s (max limit: %d records)\n", category, max_records))
     Sys.sleep(0.3)
@@ -123,37 +130,38 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
   })
 }
 
-#' Query OpenAlex API across topics and geographic terms using search parameter (per_page = 200 for 8x speedup)
-fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages = 20) {
+#' Query OpenAlex API across topic categories and geographic terms
+fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages = 5) {
   oa_key <- Sys.getenv("OPENALEX_KEY")
   if (oa_key != "") {
     options(openalexR.apikey = oa_key)
   }
   
-  geo_main <- if (length(geo_terms) > 0) geo_terms[1] else "Africa"
+  clean_geos <- str_replace_all(geo_terms, '^"|"$', '')
   
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
-    cat(sprintf("   -> [OpenAlex] Querying topic: %s (max pages: %d, 200 items/page)\n", category, max_pages))
+    clean_kws <- str_replace_all(kw_vec, '^"|"$', '')
+    cat(sprintf("   -> [OpenAlex] Querying topic category: %s\n", category))
     
-    topic_df <- map_dfr(kw_vec, function(kw) {
-      clean_kw <- str_replace_all(kw, '^"|"$', '')
-      q_str <- sprintf('"%s" "%s"', clean_kw, geo_main)
-      
-      Sys.sleep(0.3)
-      
-      block_res <- oa_fetch_retry(
-        entity = "works",
-        search = q_str,
-        from_publication_date = sprintf("%d-01-01", start_year),
-        pages = 1:max_pages,
-        per_page = 200,
-        api_key = oa_key,
-        verbose = FALSE
-      )
-      
-      if (is.null(block_res) || nrow(block_res) == 0) return(tibble())
-      block_res
+    # Query OpenAlex for topic keywords combined with geographic filters
+    topic_df <- map_dfr(clean_kws, function(kw) {
+      map_dfr(clean_geos[1:min(length(clean_geos), 3)], function(geo) {
+        q_str <- sprintf('"%s" "%s"', kw, geo)
+        Sys.sleep(0.2)
+        
+        block_res <- oa_fetch_retry(
+          entity = "works",
+          search = q_str,
+          from_publication_date = sprintf("%d-01-01", start_year),
+          pages = 1:max_pages,
+          per_page = 200,
+          api_key = oa_key,
+          verbose = FALSE
+        )
+        if (is.null(block_res) || nrow(block_res) == 0) return(tibble())
+        block_res
+      })
     })
     
     if (nrow(topic_df) == 0) return(tibble())
@@ -242,7 +250,7 @@ deduplicate_records <- function(df) {
 # 4. MASTER EXECUTION FUNCTION: run_scoping_review()
 # ------------------------------------------------------------------------------
 
-run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, max_scopus_records = 5000, max_openalex_pages = 20, output_dir = "outputs") {
+run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, max_scopus_records = 5000, max_openalex_pages = 5, output_dir = "outputs") {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
   cat("\n=================================================================\n")

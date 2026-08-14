@@ -20,7 +20,7 @@ options(openalexR.mailto = "josh.tyler@bristol.ac.uk")
 
 # 2. Search Topics & Keywords (Grouped by Category)
 SEARCH_TOPICS <- list(
-  party = c(
+  party_linkages = c(
     "political party",
     "party organization",
     "party linkage",
@@ -28,21 +28,37 @@ SEARCH_TOPICS <- list(
     "candidate selection",
     "party decline"
   ),
-  community = c(
+  constituency_representation = c(
+    "constituency service",
+    "constituency focus",
+    "constituency work",
+    "home style",
+    "district focus",
+    "local representation"
+  ),
+  responsiveness_patronage = c(
+    "service responsiveness",
     "clientelism",
-    "patronage"
+    "patronage",
+    "constituency development fund",
+    "particularistic"
   )
 )
 
 # 3. Geographic Filter Terms (Continental, Regional, or Country-Specific)
 GEO_TERMS <- c(
-  "Africa"
+  "Africa",
+  "Sub-Saharan Africa",
+  "West Africa",
+  "East Africa",
+  "Southern Africa",
+  "Central Africa"
 )
 
 # 4. Pipeline Parameters
 START_YEAR <- 2020
 MAX_SCOPUS_RECORDS <- 5000 # Maximum records to retrieve per topic from Scopus
-MAX_OPENALEX_PAGES <- 20 # Maximum pages (200 records per page) per keyword from OpenAlex
+MAX_OPENALEX_PAGES <- 20 # Maximum pages (200 records/page = 1,000 records per category) from OpenAlex
 
 # ==============================================================================
 # 5. EXECUTE SCOPING REVIEW PIPELINE
