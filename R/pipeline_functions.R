@@ -95,18 +95,14 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
   }
   set_api_key(sc_key)
   
-  # Join all geographic terms with OR
   clean_geos <- str_replace_all(geo_terms, '^"|"$', '')
   geo_scopus_str <- paste(sprintf('"%s"', clean_geos), collapse = " OR ")
   
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
     clean_kws <- str_replace_all(kw_vec, '^"|"$', '')
-    
-    # Join topic keywords with OR
     kw_str <- paste(sprintf('"%s"', clean_kws), collapse = " OR ")
     
-    # Combine (Topic ORs) AND (Geo ORs)
     scopus_q <- sprintf('TITLE-ABS-KEY((%s) AND (%s)) AND PUBYEAR > %d', kw_str, geo_scopus_str, start_year - 1)
     
     cat(sprintf("   -> [Scopus] Querying topic: %s (max limit: %d records)\n", category, max_records))
@@ -130,7 +126,7 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
   })
 }
 
-#' Query OpenAlex API across topic categories and geographic terms
+#' Query OpenAlex API: 1 single combined query per topic category (minimizes HTTP calls by 95%)
 fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages = 5) {
   oa_key <- Sys.getenv("OPENALEX_KEY")
   if (oa_key != "") {
@@ -138,38 +134,34 @@ fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages 
   }
   
   clean_geos <- str_replace_all(geo_terms, '^"|"$', '')
+  geo_or_str <- paste(sprintf('"%s"', clean_geos), collapse = " OR ")
   
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
     clean_kws <- str_replace_all(kw_vec, '^"|"$', '')
-    cat(sprintf("   -> [OpenAlex] Querying topic category: %s\n", category))
+    cat(sprintf("   -> [OpenAlex] Querying topic category: %s (max pages: %d, 200 items/page)\n", category, max_pages))
     
-    # Query OpenAlex for topic keywords combined with geographic filters
-    topic_df <- map_dfr(clean_kws, function(kw) {
-      map_dfr(clean_geos[1:min(length(clean_geos), 3)], function(geo) {
-        q_str <- sprintf('"%s" "%s"', kw, geo)
-        Sys.sleep(0.2)
-        
-        block_res <- oa_fetch_retry(
-          entity = "works",
-          search = q_str,
-          from_publication_date = sprintf("%d-01-01", start_year),
-          pages = 1:max_pages,
-          per_page = 200,
-          api_key = oa_key,
-          verbose = FALSE
-        )
-        if (is.null(block_res) || nrow(block_res) == 0) return(tibble())
-        block_res
-      })
-    })
+    kw_or_str <- paste(sprintf('"%s"', clean_kws), collapse = " OR ")
+    query_str <- sprintf('(%s) AND (%s)', kw_or_str, geo_or_str)
     
-    if (nrow(topic_df) == 0) return(tibble())
-    topic_df <- topic_df %>% distinct(id, .keep_all = TRUE)
+    Sys.sleep(0.3)
     
-    authors_vec <- parse_openalex_authors(topic_df$authorships)
+    block_res <- oa_fetch_retry(
+      entity = "works",
+      search = query_str,
+      from_publication_date = sprintf("%d-01-01", start_year),
+      pages = 1:max_pages,
+      per_page = 200,
+      api_key = oa_key,
+      verbose = FALSE
+    )
     
-    topic_df %>%
+    if (is.null(block_res) || nrow(block_res) == 0) return(tibble())
+    block_res <- block_res %>% distinct(id, .keep_all = TRUE)
+    
+    authors_vec <- parse_openalex_authors(block_res$authorships)
+    
+    block_res %>%
       mutate(
         database = "OpenAlex", query_category = category,
         scopus_id = NA_character_, openalex_id = id,
