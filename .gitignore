@@ -3,5 +3,7 @@
 .RData
 .Ruserdata
 
+.DS
+
 /.quarto/
 **/*.quarto_ipynb
