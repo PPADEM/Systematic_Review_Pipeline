@@ -2,7 +2,6 @@
 
 This repository contains an automated, end-to-end literature review pipeline written in R for conducting systematic and scoping literature reviews. It queries, merges, harmonizes, and deduplicates bibliographic records across **Elsevier Scopus** and **OpenAlex** APIs, with a specific focus on **Political Science research in Africa** (continental, regional, and country-specific scales).
 
----
 
 ## 🌟 Key Features
 
@@ -46,7 +45,7 @@ install.packages(c(
 ))
 ```
 
----
+
 
 ## ⚙️ Configuration & Setup
 
@@ -85,7 +84,7 @@ The script structures search parameters into modular blocks:
   ```
 - `SNOWBALL_ANCHORS`: Number of top-cited papers to select for citation network snowballing (default: `5`).
 
----
+
 
 ## 🚀 Running the Pipeline
 
@@ -95,7 +94,7 @@ Execute the main pipeline script from R or your terminal:
 Rscript PRISMA.R
 ```
 
----
+
 
 ## 📂 Output Files & Directory Structure
 
@@ -109,11 +108,11 @@ All generated outputs are saved to the `outputs/` directory:
 | `outputs/snowball_connections.csv` | Directed edge list (`From` / `To`) representing citation relationships. |
 | `outputs/discovered_keywords.csv` | High-frequency 2-gram and 3-gram key phrases discovered across top anchor works. |
 
----
+
 
 ## 🗺️ Downstream Analysis Strategy
 
-For advanced downstream workflows, refer to the strategic roadmap in `systematic_review_analysis_plan.md`:
+For advanced downstream workflows:
 
 1. **Geographic Scale Tagging**: Distinguishes **Author Institutional Location** (`author_countries`) from **Study Focus Location** (*Continental*, *Regional (e.g. ECOWAS, SADC)*, or *Country-Specific*) using `countrycode` gazetteer matching.
 2. **Thematic Filtering**: Filters out false positives (e.g. clinical health studies mentioning political terms) using OpenAlex Concept Filtering, Structural Topic Modeling (`stm`), and negative vocabulary lists.
