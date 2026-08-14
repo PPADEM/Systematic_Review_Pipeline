@@ -1,86 +1,120 @@
-# Automated Systematic Review Pipeline
+# Automated Scoping Literature Review Pipeline: Political Science Research in Africa
 
-This repository contains an end-to-end automated systematic review pipeline written in R. It leverages the global OpenAlex API to search academic literature, extract contextual keyword usage, build citation snowball networks, discover emerging terminology via n-grams, and visualize the research landscape.
+This repository contains an automated, end-to-end literature review pipeline written in R for conducting systematic and scoping literature reviews. It queries, merges, harmonizes, and deduplicates bibliographic records across **Elsevier Scopus** and **OpenAlex** APIs, with a specific focus on **Political Science research in Africa** (continental, regional, and country-specific scales).
 
-## Features
-1. Automated Metadata Retrieval: Bypasses manual database searches by querying OpenAlex directly, automatically sorting by the most impactful (highly cited) literature.
+---
 
-2. Contextual Keyword Extraction: Does not just find papers; it extracts the exact sentences where your target terms are used so you can immediately see how authors are defining concepts.
+## 🌟 Key Features
 
-3. Citation Snowballing: Automatically maps the backward (foundational) and forward (emerging) citation networks of your top-cited papers.
+1. **Dual-API Ingestion (Scopus + OpenAlex)**:
+   - Integrates both Elsevier Scopus (`rscopus`) and OpenAlex (`openalexR`) databases simultaneously to ensure maximum bibliographic coverage.
+   - Built-in rate-limit resilience with automated exponential backoff retries (`oa_fetch_with_retry`) to handle HTTP 429 throttling.
 
-4. N-Gram Discovery: Analyzes text to find related 2-word and 3-word phrases mathematically, helping you expand your search without guessing.
+2. **2-Stage Hybrid Deduplication Algorithm**:
+   - **Stage 1 (Clean DOI Matching)**: Standardizes DOIs (stripping protocol prefixes, `doi:` tags, and trailing slashes) and merges records present in both databases while tracking provenance (`database = "Scopus; OpenAlex"`).
+   - **Stage 2 (Normalized Fuzzy Title Matching)**: Normalizes titles (lowercasing, stripping punctuation/whitespace) and applies Jaro-Winkler string distance matching (`threshold <= 0.12`) constrained within $\pm 1$ publication year to merge records missing DOIs or suffering from minor spelling/punctuation variations.
 
+3. **Author Geographic Metadata Extraction**:
+   - Captures author institutional country codes (`author_countries`, e.g., `ZA; GB; US`) and institutional affiliations directly from OpenAlex and Scopus schemas, enabling downstream analysis of Global South vs. Global North co-authorship.
 
-## Prerequisites
-You will need R installed, along with the following packages:
+4. **Contextual Sentence Extraction**:
+   - Extracts the exact $\sim 300$-character text windows surrounding target terms within abstracts to immediately analyze conceptual definitions across authors.
 
-```{r}
-install.packages(c("openalexR", "dplyr", "stringr", "purrr", "tidyr", "visNetwork"))
+5. **Citation Snowballing & Resolution**:
+   - Resolves OpenAlex IDs for top-impact papers (even those originating from Scopus via DOI lookup) and automatically maps backward (foundational) and forward (emerging) citation networks (`oa_snowball`).
+
+6. **N-Gram Terminology Discovery**:
+   - Mathematically analyzes top-cited works to discover high-frequency bigrams and trigrams, helping expand search strategies dynamically.
+
+---
+
+## 📋 Prerequisites & Installation
+
+Ensure you have R installed (version 4.1 or higher recommended). Install the required dependencies:
+
+```R
+install.packages(c(
+  "rscopus",
+  "openalexR",
+  "dplyr",
+  "purrr",
+  "stringr",
+  "tidyr",
+  "tibble",
+  "stringdist",
+  "synthesisr"
+))
 ```
+
+---
 
 ## ⚙️ Configuration & Setup
-Before running api_pipeline.R, you must configure the parameters at the top of the script.
 
-### 1. The Polite Pool (Required)
-OpenAlex provides a faster "polite pool" for users who identify themselves. Replace the placeholder with your actual email:
-```R
-options(openalexR.mailto = "your_email@example.com")
+Prior to running `PRISMA.R`, set your API credentials and parameters:
+
+### 1. API Credentials & Environment Setup
+
+- **Scopus API Key**: Obtain a key from the Elsevier Developer Portal and set it as an environment variable in your `.Renviron` or shell:
+  ```R
+  Sys.setenv(ELSEVIER_SCOPUS_KEY = "your_scopus_api_key_here")
+  ```
+  *(Note: If no Scopus key is provided, the pipeline gracefully skips Scopus calls and executes on OpenAlex).*
+
+- **OpenAlex Polite Pool (Required)**: Identify yourself to access the OpenAlex polite pool for elevated rate limits:
+  ```R
+  options(openalexR.mailto = "your_email@example.com")
+  ```
+
+### 2. Search Logic Configuration (`PRISMA.R`)
+
+The script structures search parameters into modular blocks:
+
+- `START_YEAR`: Cutoff year for literature search (default: `2020`).
+- `AFRICA_GEO`: Regional geographic search filter string covering continental and sub-regional descriptors.
+- `QUERY_BLOCKS`: A named list of concept categories and associated keyword phrases sent to database APIs:
+  ```R
+  QUERY_BLOCKS <- list(
+    party_linkages = c('"political party"', '"party decline"', ...),
+    constituency_representation = c('"constituency service"', '"home style"', ...),
+    responsiveness_patronage = c('"clientelism"', '"patronage"', ...)
+  )
+  ```
+- `TARGET_PHRASES`: Precise phrases used for sentence-level context extraction within abstracts:
+  ```R
+  TARGET_PHRASES <- c("party decline", "clientelism", "patronage", "constituency service")
+  ```
+- `SNOWBALL_ANCHORS`: Number of top-cited papers to select for citation network snowballing (default: `5`).
+
+---
+
+## 🚀 Running the Pipeline
+
+Execute the main pipeline script from R or your terminal:
+
+```bash
+Rscript PRISMA.R
 ```
 
-### 2. Setting Your Search Terms (Crucial)
-The script separates your search logic into two distinct variables to give you maximum flexibility: `API_QUERIES` and `TARGET_PHRASES`.
+---
 
-- `API_QUERIES`: This is what is sent to the OpenAlex search engine. OpenAlex natively treats spaces as AND.
+## 📂 Output Files & Directory Structure
 
-- `TARGET_PHRASES`: This is what the R script looks for inside the text to extract the surrounding sentence context.
+All generated outputs are saved to the `outputs/` directory:
 
-#### Starting Simple (Broad Search)
-If you are starting your scoping review and just want to find everything related to a single concept:
+| Output File | Description |
+| :--- | :--- |
+| `outputs/context_mentions.csv` | **Primary Analysis Dataset**. Contains DOI, title, journal, year, citations, authors, `author_countries`, matched term, and extracted context sentences. |
+| `outputs/snowball_papers_full.rds` | Deeply nested R data object containing full metadata for all papers in the citation snowball network. |
+| `outputs/snowball_papers_flat.csv` | Flattened CSV of all forward and backward citing papers connected to your anchor papers. |
+| `outputs/snowball_connections.csv` | Directed edge list (`From` / `To`) representing citation relationships. |
+| `outputs/discovered_keywords.csv` | High-frequency 2-gram and 3-gram key phrases discovered across top anchor works. |
 
-```R
-API_QUERIES <- c(
-  "\"party decline\""
-)
+---
 
-TARGET_PHRASES <- c("party decline")
-```
+## 🗺️ Downstream Analysis Strategy
 
-#### Expanding with Geographic Filters & Multiple Phrases
-As your review progresses, you might want to narrow your search to specific regions or add alternative phrasing.
-Notice how we add "Africa" to the `API_QUERIES` to filter the database, but we DO NOT add it to the `TARGET_PHRASES`, because we only want to extract sentences discussing the decline, not sentences that just mention Africa.
-```R
-API_QUERIES <- c(
-  "\"party decline\" Africa",
-  "\"political decline\" Africa"
-)
+For advanced downstream workflows, refer to the strategic roadmap in `systematic_review_analysis_plan.md`:
 
-TARGET_PHRASES <- c("party decline", "political decline")
-```
-
-
-#### Boolean Logic Guide for API_QUERIES
-- Exact Phrases: Wrap in escaped quotes `("\"exact phrase\"")`
-- AND logic: Separate with a space `("\"party decline\" Africa")`
-- OR logic: Put them as separate items in the list `c("Term1", "Term2")`. The script automatically loops through them and combines the results.
-
-### 3. Snowball Anchors
-You can adjust how many of your top-cited papers are used to build the citation network. (Default is 5 to prevent the API from timing out or generating an unreadable hairball network).
-
-```R
-SNOWBALL_ANCHORS <- 5
-```
-
-## 📂 Output Files
-Once the script finishes running, it will generate the following files in your working directory:
-
-### Core Analysis
-- `party_decline_africa_abstracts.csv`: The primary dataset. Contains the Title, DOI, Journal, Authors, Citation Count, and the exact `context_mentions` showing the ~300 characters surrounding your target phrases.
-
-### Network & Snowballing
-- `snowball_papers_full.rds`: The raw, deeply nested R data object containing all metadata for your citation network (useful for advanced R analysis).
-- `snowball_papers_flat.csv`: A flattened, spreadsheet-friendly list of all foundational and forward-citing papers connected to your anchors.
-- `snowball_connections.csv`: The edge list (From / To) showing exactly who cited whom.
-
-### Discovery & Visualization
-- `discovered_keywords.csv:` (If open-access text is available) A list of frequent bigrams and trigrams used in your top papers to help you discover new search terms.
+1. **Geographic Scale Tagging**: Distinguishes **Author Institutional Location** (`author_countries`) from **Study Focus Location** (*Continental*, *Regional (e.g. ECOWAS, SADC)*, or *Country-Specific*) using `countrycode` gazetteer matching.
+2. **Thematic Filtering**: Filters out false positives (e.g. clinical health studies mentioning political terms) using OpenAlex Concept Filtering, Structural Topic Modeling (`stm`), and negative vocabulary lists.
+3. **PRISMA-ScR & Bibliometrics**: Uses `PRISMA2020` for PRISMA flow diagrams and `bibliometrix` for co-authorship networks, country collaboration maps, and keyword co-occurrence analysis.
