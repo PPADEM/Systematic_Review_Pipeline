@@ -6,7 +6,7 @@ An automated, user-friendly R pipeline for conducting systematic and scoping lit
 
 This pipeline automates the labor-intensive initial stages of a systematic literature review:
 
-1. **Constructs Boolean API Queries**: Combines your thematic search keywords and geographic filters using precise boolean logic.
+1. **Constructs Boolean API Queries**: Combines your thematic search keywords and geographic filters using precise boolean logic across both Scopus and OpenAlex.
 2. **Queries Scopus & OpenAlex**: Programmatically retrieves academic publications, handling pagination and rate limits automatically.
 3. **Harmonizes Metadata**: Standardizes schemas across both databases into a single clean format.
 4. **Performs 2-Stage Deduplication**: Merges duplicate papers across databases using exact DOI matching and fuzzy title string matching.
@@ -30,9 +30,10 @@ Geographic terms in `GEO_TERMS` are joined together with **`OR`** operators:
 
 The pipeline joins the topic group and the geographic group together using an **`AND`** operator, and restricts results by publication year:
 
-$$\text{Final Query} = \Big( \text{Keyword}_1 \text{ OR } \text{Keyword}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \Big( \text{GeoTerm}_1 \text{ OR } \text{GeoTerm}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \text{PUBYEAR} \ge \text{STARTYEAR}$$
+$$\text{Final Query} = \Big( \text{Keyword}_1 \text{ OR } \text{Keyword}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \Big( \text{GeoTerm}_1 \text{ OR } \text{GeoTerm}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \text{PUBYEAR} \ge \text{START\_YEAR}$$
 
-**Scopus Query Example**: `TITLE-ABS-KEY(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR > 2019`
+**Scopus & OpenAlex Query Example**:
+`(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR > 2019`
 
 ## ⚙️ Quick Start Guide
 
@@ -85,7 +86,7 @@ GEO_TERMS <- c("Africa", "Sub-Saharan Africa", "West Africa", "East Africa")
 # 3. Define Year Cutoff and Retrieval Limits
 START_YEAR          <- 2020  # Publication year cutoff (2020 onward)
 MAX_SCOPUS_RECORDS  <- 5000  # Max total records to fetch per topic from Scopus
-MAX_OPENALEX_PAGES  <- 20    # Max pages (200 records per page) from OpenAlex
+MAX_OPENALEX_PAGES  <- 5     # Max pages (200 records per page = 1,000 items) from OpenAlex
 ```
 
 ## 🚀 Running the Pipeline
@@ -102,8 +103,8 @@ When you execute `api_pipeline.R`, the system runs two main steps:
 
 ### Step 1: Ingestion & Throttling Protection
 
-- Queries Elsevier Scopus in batches of 10 items per HTTP call (conforming to developer API rules).
-- Queries OpenAlex using standard indexed fulltext search.
+- Queries Elsevier Scopus using `(Topic ORs) AND (Geo ORs)` in batches of 10 items per HTTP call (conforming to developer API rules).
+- Queries OpenAlex using `(Topic ORs) AND (Geo ORs)` with `per_page = 200` to fetch records at maximum speed.
 - Includes automatic backoff retries (`oa_fetch_retry`) to safely pause and retry if temporary API throttling occurs.
 
 ### Step 2: 2-Stage Hybrid Deduplication
