@@ -86,8 +86,8 @@ parse_openalex_authors <- function(authorships_list) {
 # 2. INGESTION FUNCTIONS: SCOPUS & OPENALEX
 # ------------------------------------------------------------------------------
 
-#' Query Elsevier Scopus API: TITLE-ABS-KEY((Topic_OR_Terms) AND (Geo_OR_Terms))
-fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records = 5000) {
+#' Query Elsevier Scopus API: TITLE-ABS-KEY((Topic_Keywords_Op) AND (Geo_OR_Terms))
+fetch_scopus_data <- function(search_topics, geo_terms, start_year, topic_operator = "OR", max_records = 5000) {
   sc_key <- Sys.getenv("ELSEVIER_SCOPUS_KEY")
   if (sc_key == "") {
     cat("   -> [Scopus] Key not found in environment (ELSEVIER_SCOPUS_KEY); skipping Scopus.\n")
@@ -95,17 +95,20 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
   }
   set_api_key(sc_key)
   
+  op <- toupper(trimws(topic_operator))
+  if (!op %in% c("OR", "AND")) op <- "OR"
+  
   clean_geos <- str_replace_all(geo_terms, '^"|"$', '')
   geo_scopus_str <- paste(sprintf('"%s"', clean_geos), collapse = " OR ")
   
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
     clean_kws <- str_replace_all(kw_vec, '^"|"$', '')
-    kw_str <- paste(sprintf('"%s"', clean_kws), collapse = " OR ")
+    kw_str <- paste(sprintf('"%s"', clean_kws), collapse = sprintf(" %s ", op))
     
     scopus_q <- sprintf('TITLE-ABS-KEY((%s) AND (%s)) AND PUBYEAR > %d', kw_str, geo_scopus_str, start_year - 1)
     
-    cat(sprintf("   -> [Scopus] Querying topic: %s (max limit: %d records)\n", category, max_records))
+    cat(sprintf("   -> [Scopus] Querying topic: %s [Topic Op: %s] (max limit: %d records)\n", category, op, max_records))
     Sys.sleep(0.3)
     
     tryCatch({
@@ -126,12 +129,15 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
   })
 }
 
-#' Query OpenAlex API: 1 single combined query per topic category (minimizes HTTP calls by 95%)
-fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages = 5) {
+#' Query OpenAlex API: 1 single combined query per topic category using configurable topic_operator ("OR" or "AND")
+fetch_openalex_data <- function(search_topics, geo_terms, start_year, topic_operator = "OR", max_pages = 5) {
   oa_key <- Sys.getenv("OPENALEX_KEY")
   if (oa_key != "") {
     options(openalexR.apikey = oa_key)
   }
+  
+  op <- toupper(trimws(topic_operator))
+  if (!op %in% c("OR", "AND")) op <- "OR"
   
   clean_geos <- str_replace_all(geo_terms, '^"|"$', '')
   geo_or_str <- paste(sprintf('"%s"', clean_geos), collapse = " OR ")
@@ -139,10 +145,10 @@ fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages 
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
     clean_kws <- str_replace_all(kw_vec, '^"|"$', '')
-    cat(sprintf("   -> [OpenAlex] Querying topic category: %s (max pages: %d, 200 items/page)\n", category, max_pages))
+    cat(sprintf("   -> [OpenAlex] Querying topic category: %s [Topic Op: %s] (max pages: %d, 200 items/page)\n", category, op, max_pages))
     
-    kw_or_str <- paste(sprintf('"%s"', clean_kws), collapse = " OR ")
-    query_str <- sprintf('(%s) AND (%s)', kw_or_str, geo_or_str)
+    kw_str <- paste(sprintf('"%s"', clean_kws), collapse = sprintf(" %s ", op))
+    query_str <- sprintf('(%s) AND (%s)', kw_str, geo_or_str)
     
     Sys.sleep(0.3)
     
@@ -242,14 +248,14 @@ deduplicate_records <- function(df) {
 # 4. MASTER EXECUTION FUNCTION: run_scoping_review()
 # ------------------------------------------------------------------------------
 
-run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, max_scopus_records = 5000, max_openalex_pages = 5, output_dir = "outputs") {
+run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, topic_operator = "OR", max_scopus_records = 5000, max_openalex_pages = 5, output_dir = "outputs") {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
   cat("\n=================================================================\n")
   cat("1. STEP 1: Fetching Records from Scopus & OpenAlex\n")
   cat("=================================================================\n")
-  scopus_raw <- fetch_scopus_data(search_topics, geo_terms, start_year, max_records = max_scopus_records)
-  openalex_raw <- fetch_openalex_data(search_topics, geo_terms, start_year, max_pages = max_openalex_pages)
+  scopus_raw <- fetch_scopus_data(search_topics, geo_terms, start_year, topic_operator = topic_operator, max_records = max_scopus_records)
+  openalex_raw <- fetch_openalex_data(search_topics, geo_terms, start_year, topic_operator = topic_operator, max_pages = max_openalex_pages)
   combined_raw <- bind_rows(scopus_raw, openalex_raw)
   
   cat(sprintf("   -> Raw Records Retrieved: %d (Scopus: %d | OpenAlex: %d)\n", nrow(combined_raw), nrow(scopus_raw), nrow(openalex_raw)))

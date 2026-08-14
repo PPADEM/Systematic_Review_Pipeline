@@ -16,23 +16,24 @@ This pipeline automates the labor-intensive initial stages of a systematic liter
 
 Understanding how your search parameters are built into API queries:
 
-### 1. Topic Keywords (`OR` Logic)
+### 1. Topic Keywords (`OR` or `AND` Logic)
 
-Keywords grouped inside each topic category in `SEARCH_TOPICS` are joined together with **`OR`** operators:
-> `("political party" OR "party organization" OR "party decline")`
+Keywords grouped inside each topic category in `SEARCH_TOPICS` are joined together using the `TOPIC_OPERATOR` setting (`"OR"` for general search, `"AND"` for targeted strict search):
+> **OR Mode** (default): `("political party" OR "party organization" OR "party decline")`
+> **AND Mode**: `("political party" AND "party organization" AND "party decline")`
 
 ### 2. Geographic Terms (`OR` Logic)
 
-Geographic terms in `GEO_TERMS` are joined together with **`OR`** operators:
+Geographic terms in `GEO_TERMS` are always joined together with **`OR`** operators:
 > `("Africa" OR "Sub-Saharan Africa" OR "West Africa")`
 
 ### 3. Combining Topics & Geography (`AND` Logic)
 
 The pipeline joins the topic group and the geographic group together using an **`AND`** operator, and restricts results by publication year:
 
-$$\text{Final Query} = \Big( \text{Keyword}_1 \text{ OR } \text{Keyword}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \Big( \text{GeoTerm}_1 \text{ OR } \text{GeoTerm}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \text{PUBYEAR} \ge \text{START\_YEAR}$$
+$$\text{Final Query} = \Big( \text{Keyword}_1 \text{ [OR/AND] } \text{Keyword}_2 \text{ [OR/AND] } \dots \Big) \mathbf{\text{ AND }} \Big( \text{GeoTerm}_1 \text{ OR } \text{GeoTerm}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \text{PUBYEAR} \ge \text{START\_YEAR}$$
 
-**Scopus & OpenAlex Query Example**:
+**Scopus & OpenAlex Query Example (`TOPIC_OPERATOR = "OR"`)**:
 `(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR > 2019`
 
 ## ⚙️ Quick Start Guide
@@ -83,10 +84,11 @@ SEARCH_TOPICS <- list(
 # 2. Define Geographic Filter Terms
 GEO_TERMS <- c("Africa", "Sub-Saharan Africa", "West Africa", "East Africa")
 
-# 3. Define Year Cutoff and Retrieval Limits
+# 3. Pipeline Parameters
 START_YEAR          <- 2020  # Publication year cutoff (2020 onward)
+TOPIC_OPERATOR      <- "OR"  # "OR" (general broad search) or "AND" (targeted strict search)
 MAX_SCOPUS_RECORDS  <- 5000  # Max total records to fetch per topic from Scopus
-MAX_OPENALEX_PAGES  <- 5     # Max pages (200 records per page = 1,000 items) from OpenAlex
+MAX_OPENALEX_PAGES  <- 5     # Max pages (200 records per page) from OpenAlex
 ```
 
 ## 🚀 Running the Pipeline
@@ -103,8 +105,8 @@ When you execute `api_pipeline.R`, the system runs two main steps:
 
 ### Step 1: Ingestion & Throttling Protection
 
-- Queries Elsevier Scopus using `(Topic ORs) AND (Geo ORs)` in batches of 10 items per HTTP call (conforming to developer API rules).
-- Queries OpenAlex using `(Topic ORs) AND (Geo ORs)` with `per_page = 200` to fetch records at maximum speed.
+- Queries Elsevier Scopus using `(Topic Keywords [OR/AND]) AND (Geo ORs)` in batches of 10 items per HTTP call.
+- Queries OpenAlex using `(Topic Keywords [OR/AND]) AND (Geo ORs)` with `per_page = 200` to fetch records at maximum speed.
 - Includes automatic backoff retries (`oa_fetch_retry`) to safely pause and retry if temporary API throttling occurs.
 
 ### Step 2: 2-Stage Hybrid Deduplication
