@@ -49,7 +49,7 @@ max_str <- function(vec) {
 }
 
 #' Safe OpenAlex API query wrapper with automated HTTP 429 retry backoff
-oa_fetch_retry <- function(..., max_retries = 3, sleep_sec = 10.0) {
+oa_fetch_retry <- function(..., max_retries = 3, sleep_sec = 5.0) {
   for (attempt in seq_len(max_retries)) {
     res <- tryCatch(
       {
@@ -103,7 +103,7 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
     scopus_q <- sprintf('TITLE-ABS-KEY((%s) AND (%s)) AND PUBYEAR > %d', kw_str, geo_str, start_year - 1)
     
     cat(sprintf("   -> [Scopus] Querying topic: %s (max limit: %d records)\n", category, max_records))
-    Sys.sleep(1.0)
+    Sys.sleep(0.3)
     
     tryCatch({
       res <- scopus_search(query = scopus_q, max_count = max_records, count = 10, verbose = FALSE)
@@ -123,7 +123,7 @@ fetch_scopus_data <- function(search_topics, geo_terms, start_year, max_records 
   })
 }
 
-#' Query OpenAlex API across topics and geographic terms using search parameter
+#' Query OpenAlex API across topics and geographic terms using search parameter (per_page = 200 for 8x speedup)
 fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages = 20) {
   oa_key <- Sys.getenv("OPENALEX_KEY")
   if (oa_key != "") {
@@ -134,19 +134,22 @@ fetch_openalex_data <- function(search_topics, geo_terms, start_year, max_pages 
   
   map_dfr(names(search_topics), function(category) {
     kw_vec <- search_topics[[category]]
-    cat(sprintf("   -> [OpenAlex] Querying topic: %s (max pages: %d)\n", category, max_pages))
+    cat(sprintf("   -> [OpenAlex] Querying topic: %s (max pages: %d, 200 items/page)\n", category, max_pages))
     
     topic_df <- map_dfr(kw_vec, function(kw) {
       clean_kw <- str_replace_all(kw, '^"|"$', '')
       q_str <- sprintf('"%s" "%s"', clean_kw, geo_main)
       
-      Sys.sleep(1.0)
+      Sys.sleep(0.3)
       
       block_res <- oa_fetch_retry(
         entity = "works",
         search = q_str,
         from_publication_date = sprintf("%d-01-01", start_year),
-        pages = 1:max_pages, verbose = FALSE
+        pages = 1:max_pages,
+        per_page = 200,
+        api_key = oa_key,
+        verbose = FALSE
       )
       
       if (is.null(block_res) || nrow(block_res) == 0) return(tibble())

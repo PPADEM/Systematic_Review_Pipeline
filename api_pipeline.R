@@ -20,7 +20,7 @@ options(openalexR.mailto = "josh.tyler@bristol.ac.uk")
 
 # 2. Search Topics & Keywords (Grouped by Category)
 SEARCH_TOPICS <- list(
-  party_linkages = c(
+  party = c(
     "political party",
     "party organization",
     "party linkage",
@@ -28,12 +28,9 @@ SEARCH_TOPICS <- list(
     "candidate selection",
     "party decline"
   ),
-  community_level = c(
-    "service responsiveness",
+  community = c(
     "clientelism",
-    "patronage",
-    "constituency development fund",
-    "particularistic"
+    "patronage"
   )
 )
 
