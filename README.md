@@ -30,7 +30,7 @@ Geographic terms in `GEO_TERMS` are joined together with **`OR`** operators:
 
 The pipeline joins the topic group and the geographic group together using an **`AND`** operator, and restricts results by publication year:
 
-$$\text{Final Query} = \Big( \text{Keyword}_1 \text{ OR } \text{Keyword}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \Big( \text{GeoTerm}_1 \text{ OR } \text{GeoTerm}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \text{PUBYEAR} \ge \text{START\_YEAR}$$
+$$\text{Final Query} = \Big( \text{Keyword}_1 \text{ OR } \text{Keyword}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \Big( \text{GeoTerm}_1 \text{ OR } \text{GeoTerm}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \text{PUBYEAR} \ge \text{STARTYEAR}$$
 
 **Scopus Query Example**: `TITLE-ABS-KEY(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR > 2019`
 
