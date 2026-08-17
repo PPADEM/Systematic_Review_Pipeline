@@ -10,7 +10,7 @@ This pipeline automates the labor-intensive initial stages of a systematic liter
 2. **Queries Scopus & OpenAlex**: Programmatically retrieves academic publications, handling pagination and rate limits automatically.
 3. **Harmonizes Metadata**: Standardizes schemas across both databases into a single clean format.
 4. **Performs 2-Stage Deduplication**: Merges duplicate papers across databases using exact DOI matching and fuzzy title string matching.
-5. **Exports Ready-to-Analyze Data**: Writes a clean, structured CSV dataset to `outputs/scoping_review_dataset.csv`.
+5. **Exports Customizable Datasets**: Saves structured CSV datasets with custom filenames (allowing multiple review runs in a single script).
 
 ## 🔍 How the Search Logic Works
 
@@ -18,7 +18,7 @@ Understanding how your search parameters are built into API queries:
 
 ### 1. Topic Keywords (`OR` or `AND` Logic)
 
-Keywords grouped inside each topic category in `SEARCH_TOPICS` are joined together using the `TOPIC_OPERATOR` setting (`"OR"` for general search, `"AND"` for targeted strict search):
+Keywords grouped inside each topic category in `SEARCH_TOPICS` are joined together using the `topic_operator` setting (`"OR"` for general search, `"AND"` for targeted strict search):
 > **OR Mode** (default): `("political party" OR "party organization" OR "party decline")`
 > **AND Mode**: `("political party" AND "party organization" AND "party decline")`
 
@@ -31,10 +31,12 @@ Geographic terms in `GEO_TERMS` are always joined together with **`OR`** operato
 
 The pipeline joins the topic group and the geographic group together using an **`AND`** operator, and restricts results by publication year:
 
-$$\text{Final Query} = \Big( \text{Keyword}_1 \text{ [OR/AND] } \text{Keyword}_2 \text{ [OR/AND] } \dots \Big) \mathbf{\text{ AND }} \Big( \text{GeoTerm}_1 \text{ OR } \text{GeoTerm}_2 \text{ OR } \dots \Big) \mathbf{\text{ AND }} \text{PUBYEAR} \ge \text{START\_YEAR}$$
+```
+Final Query = (Topic Keywords [OR/AND]) AND (Geographic Terms [OR]) AND PUBYEAR >= START_YEAR
+```
 
 **Scopus & OpenAlex Query Example (`TOPIC_OPERATOR = "OR"`)**:
-`(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR > 2019`
+> `(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR >= 2020`
 
 ## ⚙️ Quick Start Guide
 
@@ -66,57 +68,43 @@ OPENALEX_KEY="your_openalex_api_key"
 ELSEVIER_SCOPUS_KEY="your_scopus_api_key"
 ```
 
-- **OpenAlex Key**: Get a free API key at [OpenAlex.org](https://openalex.org) (unlocks 100,000 queries/day).
-- **Scopus Key**: Provided by your university library or Elsevier developer portal. *(If omitted, the pipeline skips Scopus and runs cleanly on OpenAlex)*.
+## 🛠️ Customizing & Running Multiple Reviews in One Script
 
-## 🛠️ Customizing `api_pipeline.R`
-
-All user settings are configured at the top of [`api_pipeline.R`](file:///Users/jt17630/Documents/PPADEM/Code/Systematic_Review_Pipeline/api_pipeline.R):
+You can call `run_scoping_review()` multiple times in a single R script by providing custom `output_filename` parameters:
 
 ```r
-# 1. Define Search Topics & Keywords
-SEARCH_TOPICS <- list(
-  party_linkages = c(
-    "political party", "party organization", "party linkage", "party decline"
-  )
+source("R/pipeline_functions.R")
+
+# Run 1: General Broad Search (saved to outputs/general_search.csv)
+general_data <- run_scoping_review(
+  search_topics   = list(party = c("political party", "party decline")),
+  geo_terms       = c("Africa", "Sub-Saharan Africa"),
+  start_year      = 2020,
+  topic_operator  = "OR",
+  output_filename = "general_search.csv"
 )
 
-# 2. Define Geographic Filter Terms
-GEO_TERMS <- c("Africa", "Sub-Saharan Africa", "West Africa", "East Africa")
-
-# 3. Pipeline Parameters
-START_YEAR          <- 2020  # Publication year cutoff (2020 onward)
-TOPIC_OPERATOR      <- "OR"  # "OR" (general broad search) or "AND" (targeted strict search)
-MAX_SCOPUS_RECORDS  <- 5000  # Max total records to fetch per topic from Scopus
-MAX_OPENALEX_PAGES  <- 5     # Max pages (200 records per page) from OpenAlex
+# Run 2: Targeted Strict Search (saved to outputs/targeted_search.csv)
+targeted_data <- run_scoping_review(
+  search_topics   = list(clientelism = c("clientelism", "political party")),
+  geo_terms       = c("Africa", "Sub-Saharan Africa"),
+  start_year      = 2020,
+  topic_operator  = "AND",
+  output_filename = "targeted_search.csv"
+)
 ```
 
-## 🚀 Running the Pipeline
+## 🚀 Execution
 
-Execute the pipeline directly from your terminal or Positron/RStudio console:
+Execute the script directly from your terminal or Positron/RStudio console:
 
 ```bash
 Rscript api_pipeline.R
 ```
 
-## 🔄 What Happens Under the Hood
-
-When you execute `api_pipeline.R`, the system runs two main steps:
-
-### Step 1: Ingestion & Throttling Protection
-
-- Queries Elsevier Scopus using `(Topic Keywords [OR/AND]) AND (Geo ORs)` in batches of 10 items per HTTP call.
-- Queries OpenAlex using `(Topic Keywords [OR/AND]) AND (Geo ORs)` with `per_page = 200` to fetch records at maximum speed.
-- Includes automatic backoff retries (`oa_fetch_retry`) to safely pause and retry if temporary API throttling occurs.
-
-### Step 2: 2-Stage Hybrid Deduplication
-
-- **Stage 1 (Clean DOI Exact Match)**: Standardizes DOIs (stripping `https://doi.org/`, `doi:`, trailing slashes, and lowercasing) and merges records found in both databases while tracking provenance (`database = "Scopus; OpenAlex"`).
-- **Stage 2 (Title Fuzzy Match)**: Cleans title punctuation and applies Jaro-Winkler string distance matching ($\le 0.12$) constrained within $\pm 1$ publication year to merge records missing DOIs or suffering from minor title typos.
-
 ## 📊 Output File Schema
 
-The final deduplicated dataset is saved to `outputs/scoping_review_dataset.csv`:
+Outputs are exported to `outputs/<output_filename>`:
 
 | Column Name | Description | Example |
 |:-----------------------|:-----------------------|:-----------------------|
@@ -131,14 +119,3 @@ The final deduplicated dataset is saved to `outputs/scoping_review_dataset.csv`:
 | `citations` | Highest reported citation count | `14` |
 | `abstract` | Full article text abstract | `This article examines...` |
 | `authors` | Semicolon-separated list of author names | `Smith, J.; Kwame, A.` |
-
-## 📁 Repository Structure
-
-```
-├── README.md               # Pipeline documentation & user guide
-├── api_pipeline.R          # Simple user configuration & execution script
-├── R/
-│   └── pipeline_functions.R # Modular function library (fetching, deduplication, helpers)
-└── outputs/
-    └── scoping_review_dataset.csv # Main output dataset
-```

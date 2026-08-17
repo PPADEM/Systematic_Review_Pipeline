@@ -248,11 +248,25 @@ deduplicate_records <- function(df) {
 # 4. MASTER EXECUTION FUNCTION: run_scoping_review()
 # ------------------------------------------------------------------------------
 
-run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, topic_operator = "OR", max_scopus_records = 5000, max_openalex_pages = 5, output_dir = "outputs") {
+run_scoping_review <- function(
+  search_topics, 
+  geo_terms, 
+  start_year = 2020, 
+  topic_operator = "OR", 
+  max_scopus_records = 5000, 
+  max_openalex_pages = 5, 
+  output_dir = "outputs",
+  output_filename = "scoping_review_dataset.csv"
+) {
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
   
+  # Ensure filename ends with .csv extension
+  if (!str_detect(output_filename, "\\.csv$")) {
+    output_filename <- paste0(output_filename, ".csv")
+  }
+  
   cat("\n=================================================================\n")
-  cat("1. STEP 1: Fetching Records from Scopus & OpenAlex\n")
+  cat(sprintf("1. STEP 1: Fetching Records from Scopus & OpenAlex [%s]\n", output_filename))
   cat("=================================================================\n")
   scopus_raw <- fetch_scopus_data(search_topics, geo_terms, start_year, topic_operator = topic_operator, max_records = max_scopus_records)
   openalex_raw <- fetch_openalex_data(search_topics, geo_terms, start_year, topic_operator = topic_operator, max_pages = max_openalex_pages)
@@ -271,7 +285,7 @@ run_scoping_review <- function(search_topics, geo_terms, start_year = 2020, topi
   clean_data <- deduplicate_records(combined_raw)
   cat(sprintf("   -> Clean Dataset: %d unique records (Merged %d duplicates)\n", nrow(clean_data), nrow(combined_raw) - nrow(clean_data)))
   
-  main_csv <- file.path(output_dir, "scoping_review_dataset.csv")
+  main_csv <- file.path(output_dir, output_filename)
   write.csv(clean_data, main_csv, row.names = FALSE)
   
   cat("\n=================================================================\n")
