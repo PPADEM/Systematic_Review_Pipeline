@@ -16,9 +16,7 @@ suppressPackageStartupMessages({
   library(stringdist)
 })
 
-# ------------------------------------------------------------------------------
-# 1. HELPER & CLEANING UTILITIES
-# ------------------------------------------------------------------------------
+#### 1. HELPER & CLEANING UTILITIES ####
 
 #' Standardize DOIs (strip protocols, prefixes, and trailing slashes)
 clean_doi <- function(doi_vec) {
@@ -82,9 +80,7 @@ parse_openalex_authors <- function(authorships_list) {
   })
 }
 
-# ------------------------------------------------------------------------------
-# 2. INGESTION FUNCTIONS: SCOPUS & OPENALEX
-# ------------------------------------------------------------------------------
+#### 2. INGESTION FUNCTIONS: SCOPUS & OPENALEX ####
 
 #' Query Elsevier Scopus API: TITLE-ABS-KEY((Topic_Keywords_Op) AND (Geo_OR_Terms))
 fetch_scopus_data <- function(search_topics, geo_terms, start_year, topic_operator = "OR", max_records = 5000) {
@@ -181,9 +177,7 @@ fetch_openalex_data <- function(search_topics, geo_terms, start_year, topic_oper
   })
 }
 
-# ------------------------------------------------------------------------------
-# 3. 2-STAGE HYBRID DEDUPLICATION FUNCTION
-# ------------------------------------------------------------------------------
+#### 3. 2-STAGE HYBRID DEDUPLICATION FUNCTION ####
 
 #' Perform Stage 1 (Clean DOI Exact) and Stage 2 (Normalized Title Jaro-Winkler) Deduplication
 deduplicate_records <- function(df) {
@@ -244,9 +238,7 @@ deduplicate_records <- function(df) {
     ) %>% select(-dup_group)
 }
 
-# ------------------------------------------------------------------------------
-# 4. MASTER EXECUTION FUNCTION: run_scoping_review()
-# ------------------------------------------------------------------------------
+#### 4. MASTER EXECUTION FUNCTION: run_scoping_review() ####
 
 run_scoping_review <- function(
   search_topics, 
