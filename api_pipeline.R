@@ -27,7 +27,7 @@ START_YEAR          <- 2020
 MAX_SCOPUS_RECORDS  <- 5000 # Maximum records to retrieve per topic from Scopus
 MAX_OPENALEX_PAGES  <- 5    # Maximum pages (200 records/page = 1,000 items) from OpenAlex
 
-#### 3. RUN 1: General Broad Search (using OR) ####
+#### 3. RUN 1: General Broad Search (using OR - saved at root) ####
 GENERAL_TOPICS <- list(
   party_linkages = c(
     "political party",
@@ -49,10 +49,10 @@ general_results <- run_scoping_review(
   topic_operator      = "OR",
   max_scopus_records  = MAX_SCOPUS_RECORDS,
   max_openalex_pages  = MAX_OPENALEX_PAGES,
-  output_filename     = "general_scoping_review.csv"
+  output_filename     = "general_scoping_review.csv"  # Saved at folder root
 )
 
-#### 4. RUN 2: Targeted Strict Search (using AND) ####
+#### 4. RUN 2: Targeted Strict Search (using AND - saved in outputs/ subfolder) ####
 TARGETED_TOPICS <- list(
   patronage_parties = c("clientelism", "political party")
 )
@@ -64,5 +64,5 @@ targeted_results <- run_scoping_review(
   topic_operator      = "AND",
   max_scopus_records  = MAX_SCOPUS_RECORDS,
   max_openalex_pages  = MAX_OPENALEX_PAGES,
-  output_filename     = "targeted_scoping_review.csv"
+  output_filename     = "outputs/targeted_scoping_review.csv"  # Saved in outputs/ subfolder
 )

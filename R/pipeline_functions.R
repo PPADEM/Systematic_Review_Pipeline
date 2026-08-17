@@ -247,14 +247,17 @@ run_scoping_review <- function(
   topic_operator = "OR", 
   max_scopus_records = 5000, 
   max_openalex_pages = 5, 
-  output_dir = "outputs",
   output_filename = "scoping_review_dataset.csv"
 ) {
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  
   # Ensure filename ends with .csv extension
   if (!str_detect(output_filename, "\\.csv$")) {
     output_filename <- paste0(output_filename, ".csv")
+  }
+  
+  # Auto-create target directory if a relative or absolute subfolder path is passed
+  target_dir <- dirname(output_filename)
+  if (target_dir != "." && !dir.exists(target_dir)) {
+    dir.create(target_dir, recursive = TRUE)
   }
   
   cat("\n=================================================================\n")
@@ -277,11 +280,10 @@ run_scoping_review <- function(
   clean_data <- deduplicate_records(combined_raw)
   cat(sprintf("   -> Clean Dataset: %d unique records (Merged %d duplicates)\n", nrow(clean_data), nrow(combined_raw) - nrow(clean_data)))
   
-  main_csv <- file.path(output_dir, output_filename)
-  write.csv(clean_data, main_csv, row.names = FALSE)
+  write.csv(clean_data, output_filename, row.names = FALSE)
   
   cat("\n=================================================================\n")
-  cat(sprintf("SUCCESS! Pipeline Complete. Main dataset saved to:\n  %s\n", main_csv))
+  cat(sprintf("SUCCESS! Pipeline Complete. Dataset saved to:\n  %s\n", output_filename))
   cat("=================================================================\n\n")
   
   return(clean_data)

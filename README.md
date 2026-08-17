@@ -10,7 +10,7 @@ This pipeline automates the labor-intensive initial stages of a systematic liter
 2. **Queries Scopus & OpenAlex**: Programmatically retrieves academic publications, handling pagination and rate limits automatically.
 3. **Harmonizes Metadata**: Standardizes schemas across both databases into a single clean format.
 4. **Performs 2-Stage Deduplication**: Merges duplicate papers across databases using exact DOI matching and fuzzy title string matching.
-5. **Exports Customizable Datasets**: Saves structured CSV datasets with custom filenames (allowing multiple review runs in a single script).
+5. **Exports Customizable Datasets**: Saves structured CSV datasets directly to root or to custom subfolder paths specified in `output_filename`.
 
 ## 🔍 How the Search Logic Works
 
@@ -35,8 +35,7 @@ The pipeline joins the topic group and the geographic group together using an **
 Final Query = (Topic Keywords [OR/AND]) AND (Geographic Terms [OR]) AND PUBYEAR >= START_YEAR
 ```
 
-**Scopus & OpenAlex Query Example (`TOPIC_OPERATOR = "OR"`)**:
-> `(("political party" OR "party decline") AND ("Africa" OR "Sub-Saharan Africa")) AND PUBYEAR >= 2020`
+---
 
 ## ⚙️ Quick Start Guide
 
@@ -68,14 +67,16 @@ OPENALEX_KEY="your_openalex_api_key"
 ELSEVIER_SCOPUS_KEY="your_scopus_api_key"
 ```
 
-## 🛠️ Customizing & Running Multiple Reviews in One Script
+---
 
-You can call `run_scoping_review()` multiple times in a single R script by providing custom `output_filename` parameters:
+## 🛠️ Customizing Output File Locations
+
+By default, files are saved directly at the repository root folder. If a subfolder path is included in `output_filename`, the directory is created automatically:
 
 ```r
 source("R/pipeline_functions.R")
 
-# Run 1: General Broad Search (saved to outputs/general_search.csv)
+# Run 1: Saved directly at root folder (general_search.csv)
 general_data <- run_scoping_review(
   search_topics   = list(party = c("political party", "party decline")),
   geo_terms       = c("Africa", "Sub-Saharan Africa"),
@@ -84,13 +85,13 @@ general_data <- run_scoping_review(
   output_filename = "general_search.csv"
 )
 
-# Run 2: Targeted Strict Search (saved to outputs/targeted_search.csv)
+# Run 2: Saved inside outputs/ subfolder (outputs/targeted_search.csv)
 targeted_data <- run_scoping_review(
   search_topics   = list(clientelism = c("clientelism", "political party")),
   geo_terms       = c("Africa", "Sub-Saharan Africa"),
   start_year      = 2020,
   topic_operator  = "AND",
-  output_filename = "targeted_search.csv"
+  output_filename = "outputs/targeted_search.csv"
 )
 ```
 
@@ -102,9 +103,11 @@ Execute the script directly from your terminal or Positron/RStudio console:
 Rscript api_pipeline.R
 ```
 
+---
+
 ## 📊 Output File Schema
 
-Outputs are exported to `outputs/<output_filename>`:
+Outputs are exported to the location specified in `output_filename`:
 
 | Column Name | Description | Example |
 |:-----------------------|:-----------------------|:-----------------------|
