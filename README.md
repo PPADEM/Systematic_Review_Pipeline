@@ -25,18 +25,20 @@ Keywords grouped inside each topic category in `SEARCH_TOPICS` are joined togeth
 > **MULTI Mode**: Combines multiple concept blocks (e.g. `BLOCK 1` AND `BLOCK 2` AND ... AND `BLOCK N`), where terms inside each block are separated by `OR`:
 > `((Block 1 terms separated by OR) AND (Block 2 terms separated by OR)) AND (GEO terms separated by OR)`
 
-### 2. Geographic Terms (`OR` Logic)
+### 2. Geographic Terms (`OR` Logic, Optional)
 
-Geographic terms in `GEO_TERMS` are always joined together with **`OR`** operators:
+Geographic terms in `GEO_TERMS` are optional. When provided, they are joined together with **`OR`** operators:
 > `("Africa" OR "Sub-Saharan Africa" OR "West Africa")`
+
+If `geo_terms = NULL` or omitted, no geographic filter is applied, allowing for a general/global broad search.
 
 ### 3. Combining Topics & Geography (`AND` Logic)
 
-The pipeline joins the topic group and the geographic group together using an **`AND`** operator, and restricts results by publication year:
+When `geo_terms` are provided, the pipeline joins the topic group and the geographic group together using an **`AND`** operator. When `geo_terms` is `NULL`, only the topic query and publication year filter are applied:
 
 ```
-Final Query (OR/AND mode) = (Topic Keywords [OR/AND]) AND (Geographic Terms [OR]) AND PUBYEAR >= START_YEAR
-Final Query (MULTI mode)  = ((Block 1 [OR]) AND (Block 2 [OR])) AND (Geographic Terms [OR]) AND PUBYEAR >= START_YEAR
+Final Query with Geography = (Topic Keywords [OR/AND]) AND (Geographic Terms [OR]) AND PUBYEAR >= START_YEAR
+Final Query without Geography = (Topic Keywords [OR/AND]) AND PUBYEAR >= START_YEAR
 ```
 
 ---
@@ -120,6 +122,8 @@ Outputs are exported to the location specified in `output_filename`:
 |:-----------------------|:-----------------------|:-----------------------|
 | `database` | Provenance database source(s) | `Scopus; OpenAlex` |
 | `query_category` | Thematic search category or multi-block combination | `party_linkages` or `party_block & communication_block` |
+| `search_query` | Exact Boolean API search query string executed for this record | `("political party" OR "party decline") AND ("Africa" OR ...)` |
+| `search_date` | Date (`YYYY-MM-DD`) when the search pipeline was executed | `2026-08-24` |
 | `scopus_id` | Scopus record identifier | `2-s2.0-85123456789` |
 | `openalex_id` | OpenAlex work URI | `https://openalex.org/W4323539164` |
 | `title` | Article title | `Parties, Political Finance, and Representation` |

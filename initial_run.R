@@ -15,12 +15,17 @@ if (Sys.getenv("ELSEVIER_SCOPUS_KEY") != "") {
 options(openalexR.mailto = "josh.tyler@bristol.ac.uk")
 
 #### 2. Shared Parameters ####
-GEO_TERMS <- c("Africa")
+GEO_TERMS <- c(
+  "Africa",
+  am_countries$Country,
+  unique(am_countries$Region),
+  unique(am_countries$Region_Detailed)
+)
 START_YEAR <- 2020
 MAX_SCOPUS_RECORDS <- 5000 # Maximum records to retrieve per topic from Scopus
 MAX_OPENALEX_PAGES <- 5 # Maximum pages (200 records/page = 1,000 items) from OpenAlex
 
-#### 3. RUN 1: Multi-Block Concept Search (BLOCK 1 AND BLOCK 2 AND GEO - saved at root) ####
+#### 3. RUN 1: Multi-Block Concept Search (BLOCK 1 AND BLOCK 2 AND GEO) ####
 # Combines (Party terms separated by OR) AND (Communication terms separated by OR) AND (Africa)
 MULTI_TOPICS <- list(
   political_party = c(
@@ -52,13 +57,21 @@ multi_results <- run_scoping_review(
   topic_operator = "multi",
   max_scopus_records = MAX_SCOPUS_RECORDS,
   max_openalex_pages = MAX_OPENALEX_PAGES,
-  output_filename = "multi_block_scoping_review.csv" # Saved at folder root
+  output_filename = "outputs/multi.csv" # Saved at folder root
 )
 
-#### 4. RUN 2: General Broad Search (using OR - saved in outputs/ subfolder) ####
+#### 4. RUN 2: General Broad Search ####
 GENERAL_TOPICS <- list(
-  political_party = c("Intra-party politics", "Party organisation"),
-  communication = c("Communication", "Meeting")
+  political_party = c(
+    "Intra-party politics",
+    "Intraparty politics",
+    "Intra-party democracy",
+    "Intraparty democracy",
+    "Party organisation",
+    "Party organization",
+    "Party Institutionalisation",
+    "Party Institutionalization"
+  )
 )
 
 general_results <- run_scoping_review(
@@ -68,20 +81,16 @@ general_results <- run_scoping_review(
   topic_operator = "OR",
   max_scopus_records = MAX_SCOPUS_RECORDS,
   max_openalex_pages = MAX_OPENALEX_PAGES,
-  output_filename = "outputs/general_scoping_review.csv"
+  output_filename = "outputs/general.csv"
 )
 
-#### 5. RUN 3: Targeted Strict Search (using AND - saved in outputs/ subfolder) ####
-TARGETED_TOPICS <- list(
-  patronage_parties = c("clientelism", "political party")
-)
+#### 4. RUN 3: General Broad Search - NO GEO ####
 
-targeted_results <- run_scoping_review(
-  search_topics = TARGETED_TOPICS,
-  geo_terms = GEO_TERMS,
+no_geo_results <- run_scoping_review(
+  search_topics = GENERAL_TOPICS,
   start_year = START_YEAR,
-  topic_operator = "AND",
+  topic_operator = "OR",
   max_scopus_records = MAX_SCOPUS_RECORDS,
   max_openalex_pages = MAX_OPENALEX_PAGES,
-  output_filename = "outputs/targeted_scoping_review.csv" # Saved in outputs/ subfolder
+  output_filename = "outputs/no_geo.csv"
 )
